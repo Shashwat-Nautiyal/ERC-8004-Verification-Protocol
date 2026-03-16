@@ -1,0 +1,45 @@
+[
+  {
+    "type": "event",
+    "name": "ValidationRequest",
+    "inputs": [
+      { "name": "router",      "type": "address", "indexed": true  },
+      { "name": "requestId",   "type": "bytes32", "indexed": true  },
+      { "name": "requestURI",  "type": "string",  "indexed": false },
+      { "name": "requestHash", "type": "bytes32", "indexed": false },
+      { "name": "deadline",    "type": "uint256", "indexed": false }
+    ]
+  },
+  {
+    "type": "event",
+    "name": "ValidationResponse",
+    "inputs": [
+      { "name": "router",    "type": "address", "indexed": true },
+      { "name": "requestId", "type": "bytes32",  "indexed": true },
+      { "name": "score",     "type": "uint8",    "indexed": false },
+      { "name": "validator", "type": "address",  "indexed": true }
+    ]
+  },
+  {
+    "type": "function",
+    "name": "getValidationRequest",
+    "stateMutability": "view",
+    "inputs":  [{ "name": "requestId", "type": "bytes32" }],
+    "outputs": [
+      { "name": "router",      "type": "address" },
+      { "name": "requestURI",  "type": "string"  },
+      { "name": "requestHash", "type": "bytes32" },
+      { "name": "deadline",    "type": "uint256" }
+    ]
+  },
+  {
+    "type": "function",
+    "name": "postValidationResponse",
+    "stateMutability": "nonpayable",
+    "inputs": [
+      { "name": "requestId", "type": "bytes32" },
+      { "name": "score",     "type": "uint8"   }
+    ],
+    "outputs": []
+  }
+]

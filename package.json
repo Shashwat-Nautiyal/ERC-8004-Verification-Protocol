@@ -1,0 +1,30 @@
+{
+  "name": "erc8004-verification",
+  "version": "0.1.0",
+  "description": "ERC-8004 validation node: fetch mandates, verify, post scores",
+  "type": "module",
+  "scripts": {
+    "build":            "tsc",
+    "start":            "node dist/main.js",
+    "dev":              "tsx src/main.ts",
+    "reputation":       "tsx src/reputation/index.ts",
+    "seed":             "tsx scripts/seed-request.ts",
+    "e2e":              "tsx scripts/run-e2e.ts",
+    "test":             "vitest run",
+    "test:watch":       "vitest",
+    "test:unit":        "vitest run tests/unit",
+    "test:integration": "vitest run tests/integration"
+  },
+  "dependencies": {
+    "dotenv":  "^16.4.5",
+    "ethers":  "^6.13.1",
+    "express": "^4.19.2"
+  },
+  "devDependencies": {
+    "@types/express": "^4.17.21",
+    "@types/node":    "^20.14.9",
+    "tsx":            "^4.16.2",
+    "typescript":     "^5.5.3",
+    "vitest":         "^1.6.0"
+  }
+}
