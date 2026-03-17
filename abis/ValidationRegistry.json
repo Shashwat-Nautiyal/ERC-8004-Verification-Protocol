@@ -34,6 +34,19 @@
   },
   {
     "type": "function",
+    "name": "validationRequest",
+    "stateMutability": "nonpayable",
+    "inputs": [
+      { "name": "router",      "type": "address" },
+      { "name": "requestId",   "type": "bytes32" },
+      { "name": "requestURI",  "type": "string"  },
+      { "name": "requestHash", "type": "bytes32" },
+      { "name": "deadline",    "type": "uint256" }
+    ],
+    "outputs": []
+  },
+  {
+    "type": "function",
     "name": "postValidationResponse",
     "stateMutability": "nonpayable",
     "inputs": [

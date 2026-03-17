@@ -15,7 +15,9 @@ export async function startPollLoop(routerAddress: string): Promise<void> {
   logger.info(`Starting poll loop for router ${routerAddress}`);
 
   const provider = new ethers.JsonRpcProvider(env.RPC_URL);
-  let fromBlock = await provider.getBlockNumber();
+  // Start one block ahead so the first tick only picks up events from NEW blocks.
+  // Avoids reprocessing historical events that predate this node startup.
+  let fromBlock = (await provider.getBlockNumber()) + 1;
 
   const tick = async () => {
     try {
