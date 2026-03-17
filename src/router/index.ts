@@ -1,3 +1,4 @@
+import { ethers } from "ethers";
 import { pollValidationRequests, writeValidationResponse, hydrateReceiptLogs } from "../registry/index.js";
 import { getVerifiers } from "../verifiers/registry.js";
 import { aggregateScores } from "./aggregator.js";
@@ -13,12 +14,12 @@ const processed = new Set<string>();
 export async function startPollLoop(routerAddress: string): Promise<void> {
   logger.info(`Starting poll loop for router ${routerAddress}`);
 
-  const provider = (await import("ethers")).ethers.getDefaultProvider(env.RPC_URL);
-  let fromBlock = await (provider as any).getBlockNumber() as number;
+  const provider = new ethers.JsonRpcProvider(env.RPC_URL);
+  let fromBlock = await provider.getBlockNumber();
 
   const tick = async () => {
     try {
-      const currentBlock = await (provider as any).getBlockNumber() as number;
+      const currentBlock = await provider.getBlockNumber();
       const requests = await pollValidationRequests(routerAddress, fromBlock, currentBlock);
 
       for (const req of requests) {

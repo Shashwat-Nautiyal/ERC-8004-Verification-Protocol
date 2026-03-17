@@ -14,7 +14,7 @@
  *   - Validator server running at BASE_URL (npm run dev)
  */
 import { ethers } from "ethers";
-import { createHash } from "crypto";
+
 import abi from "../abis/ValidationRegistry.json" with { type: "json" };
 import "dotenv/config";
 
@@ -65,9 +65,7 @@ async function main() {
   };
 
   const payloadJson = JSON.stringify(mockPayload);
-  const requestHash = "0x" + createHash("sha3-256")
-    .update(Buffer.from(payloadJson, "utf8"))
-    .digest("hex");
+  const requestHash = ethers.keccak256(ethers.toUtf8Bytes(payloadJson));
 
   // 2. Post payload to the server so the validator can fetch it
   const requestId    = ethers.hexlify(ethers.randomBytes(32));
