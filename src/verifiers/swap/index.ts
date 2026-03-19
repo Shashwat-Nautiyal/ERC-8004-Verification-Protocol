@@ -32,17 +32,21 @@ export class SwapReceiptVerifier implements IVerifier {
       );
     }
 
+    // Amounts from JSON arrive as string | number; normalise to BigInt before comparison
+    const mandateAmountIn     = BigInt(String(payload.amountIn));
+    const mandateAmountOutMin = BigInt(String(payload.amountOutMin));
+
     // Amount in at least what was declared
-    if (swap.amountIn < payload.amountIn) {
+    if (swap.amountIn < mandateAmountIn) {
       return this.fail(
-        `amountIn too low: got ${swap.amountIn}, expected >= ${payload.amountIn}`
+        `amountIn too low: got ${swap.amountIn}, expected >= ${mandateAmountIn}`
       );
     }
 
     // Amount out meets minimum
-    if (swap.amountOut < payload.amountOutMin) {
+    if (swap.amountOut < mandateAmountOutMin) {
       return this.fail(
-        `amountOut below minimum: got ${swap.amountOut}, min=${payload.amountOutMin}`
+        `amountOut below minimum: got ${swap.amountOut}, min=${mandateAmountOutMin}`
       );
     }
 

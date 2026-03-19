@@ -4,11 +4,13 @@
   "description": "ERC-8004 validation node: fetch mandates, verify, post scores",
   "type": "module",
   "scripts": {
+    "setup":            "bash scripts/setup.sh",
     "build":            "tsc",
     "start":            "node dist/main.js",
     "dev":              "tsx src/main.ts",
     "reputation":       "tsx src/reputation/index.ts",
     "seed":             "tsx scripts/seed-request.ts",
+    "seed:signed":      "tsx scripts/seed-signed.ts",
     "e2e":              "tsx scripts/run-e2e.ts",
     "test":             "vitest run",
     "test:watch":       "vitest",

@@ -94,4 +94,14 @@ describe("SwapReceiptVerifier", () => {
     const result = await verifier.verify(makeMandate() as Mandate, makeReceipt());
     expect(result.passed).toBe(false);
   });
+
+  it("passes when amounts are strings (as received from JSON.parse)", async () => {
+    const mandate = makeMandate();
+    // Simulate what JSON.parse produces — amounts are strings, not BigInts
+    (mandate.payload as unknown as Record<string, unknown>).amountIn     = "100";
+    (mandate.payload as unknown as Record<string, unknown>).amountOutMin = "90";
+    const result = await verifier.verify(mandate as Mandate, makeReceipt());
+    expect(result.passed).toBe(true);
+    expect(result.score).toBe(100);
+  });
 });
