@@ -9,29 +9,87 @@ Given a signed **Mandate** (what an agent was asked to do) and an **action recei
 ## Architecture
 
 ```
-ValidationRegistry (on-chain)
-        │  ValidationRequest event
-        ▼
-  ┌─────────────────────────────────────┐
-  │           Router (Poll Loop)         │
-  │  1. poll events (15 s tick)          │
-  │  2. fetch + keccak256 verify payload │
-  │  3. hydrate receipt logs from RPC    │
-  │  4. dispatch to verifier pipeline    │
-  │  5. aggregate → floor(mean) [0,100]  │
-  │  6. save breakdown to store          │
-  │  7. post validationResponse on-chain │
-  └───────────────┬─────────────────────┘
-                  │
-  ┌───────────────▼─────────────────────┐
-  │         Express HTTP Server          │
-  │  POST /responses          (internal) │
-  │  GET  /responses/:id      responseURI│
-  │  GET  /reputation/:agentId  CLI/API  │
-  │  POST /mock-payloads        (dev)    │
-  │  GET  /mock-payload/:id     (dev)    │
-  └─────────────────────────────────────┘
+  ┌─────────────────────────────────────────────────────────────┐
+  │                          AGENT                               │
+  │  - signs EIP-712 Mandate                                     │
+  │  - provides action receipt (txHash or raw logs)              │
+  └───────────┬──────────────────────────────┬──────────────────┘
+              │                              │
+              │ 1. POST /mock-payloads        │ 2. validationRequest()
+              │    (upload RouterPayload)     │    (on-chain call)
+              ▼                              ▼
+  ┌───────────────────────┐    ┌──────────────────────────────┐
+  │   HTTP Server :3000   │    │   ValidationRegistry         │
+  │   (off-chain)         │    │   (on-chain, ERC-8004)       │
+  │                       │    │                              │
+  │  GET /mock-payload/id ◄────┤ emit: ValidationRequest      │
+  │  POST /responses      │    │ store: postValidationResponse │
+  │  GET /responses/:id   │    └──────────────┬───────────────┘
+  │  GET /reputation/:id  │                   │
+  └───────────┬───────────┘                   │ 3. poll events (15 s)
+              │                               │
+              │ 4. GET requestURI             │
+              │    verify keccak256           │
+              ▼                               ▼
+  ┌─────────────────────────────────────────────────────────────┐
+  │                  Router  (Poll Loop)                         │
+  │                                                             │
+  │   Fetcher ──► hash check ──► Receipt Hydrator (RPC logs)   │
+  │                                      │                      │
+  │                     5. route by mandate.core.kind           │
+  │                                      │                      │
+  │              ┌───────────────────────┴──────────────────┐  │
+  │              │          Verifier Pipeline                │  │
+  │              │                                           │  │
+  │              │  ┌─────────────────┐ ┌─────────────────┐ │  │
+  │              │  │   Integrity     │ │  Swap Receipt   │ │  │
+  │              │  │   Verifier      │ │  Verifier       │ │  │
+  │              │  │ · required fields│ │ · amountIn/Out  │ │  │
+  │              │  │ · deadline check │ │ · recipient     │ │  │
+  │              │  │ · EIP-712 sig   │ │ · chain match   │ │  │
+  │              │  │ · sybil check   │ │ · Swap log decod│ │  │
+  │              │  └────────┬────────┘ └────────┬────────┘ │  │
+  │              │           └──────┬─────────────┘          │  │
+  │              │                  │ score: 0–100 each       │  │
+  │              │                  ▼                         │  │
+  │              │       ┌─────────────────────┐             │  │
+  │              │       │     Aggregator      │             │  │
+  │              │       │  floor(mean(scores))│             │  │
+  │              │       │  clamp → [0, 100]   │             │  │
+  │              │       └──────────┬──────────┘             │  │
+  │              └──────────────────┼────────────────────────┘  │
+  │                                 │ finalScore                  │
+  └─────────────────────────────────┼─────────────────────────────┘
+                    ┌───────────────┴────────────────┐
+                    │                                │
+                    ▼                                ▼
+  ┌─────────────────────────────┐   ┌───────────────────────────┐
+  │   ValidationRegistry        │   │   HTTP Server :3000        │
+  │   postValidationResponse()  │   │   POST /responses          │
+  │   emit: ValidationResponse  │   │   (score + breakdown store)│
+  └─────────────────────────────┘   └──────────────┬────────────┘
+                                                    │
+                                                    ▼
+                                       ┌────────────────────────┐
+                                       │      CONSUMER          │
+                                       │  GET /responses/:id    │
+                                       │  GET /reputation/:id   │
+                                       │  CLI: npm run reputation│
+                                       └────────────────────────┘
 ```
+
+**Key flows:**
+
+| Step | What happens |
+|---|---|
+| 1–2 | Agent uploads payload to server and calls `validationRequest()` on-chain |
+| 3 | Router polls `ValidationRequest` events every 15 s, filtered by its own address |
+| 4 | Fetcher downloads payload from `requestURI`, rejects if keccak256 hash mismatches |
+| 5 | Router reads `mandate.core.kind` (`swap@1`) and selects the verifier pipeline |
+| 6 | Each verifier scores independently (0 or 100); crashes return 0, never abort |
+| 7 | Aggregator computes `floor(mean(scores))`, clamped to `[0, 100]` |
+| 8 | Score posted on-chain via `postValidationResponse()`; breakdown saved to store |
+| 9 | Consumer reads `GET /responses/:id` (responseURI) or `GET /reputation/:agentId` |
 
 ---
 
@@ -142,37 +200,6 @@ npm run reputation -- 0x70997970C51812dc3A010C7d01b50e0d17dc79C8 --onchain
 
 ---
 
-## Full Session Workflow
-
-```
-# Terminal 1
-anvil
-
-# Terminal 2
-npm run setup          # deploy contract, auto-update .env
-npm run dev            # start validator node
-
-# Terminal 3
-npm run seed:signed    # seed a real signed request → score 100
-curl http://localhost:3000/reputation/0x70997970C51812dc3A010C7d01b50e0d17dc79C8
-```
-
-> After every `anvil` restart: run `npm run setup` again before `npm run dev`.
-
----
-
-## Where `.env` Values Come From
-
-| Variable | Source |
-|---|---|
-| `RPC_URL` | Anvil's default listen address — always `http://127.0.0.1:8545` |
-| `PRIVATE_KEY` | Anvil account #0 private key — printed on Anvil startup |
-| `VALIDATOR_ADDRESS` | Public address derived from `PRIVATE_KEY` (account #0) |
-| `ROUTER_ADDRESS` | Same as `VALIDATOR_ADDRESS` for MVP — the EOA that filters events |
-| `REGISTRY_ADDRESS` | **Set automatically by `npm run setup`** — changes each Anvil session |
-| `BASE_URL` | Local Express server — always `http://localhost:3000` |
-
----
 
 ## Running Tests
 
